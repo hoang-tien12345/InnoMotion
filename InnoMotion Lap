@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quản lý 20 Phòng – Trạng thái sử dụng</title>
+  <style>
+    :root{
+      --bg:#0f172a;          /* slate-900 */
+      --card:#111827;        /* gray-900 */
+      --muted:#94a3b8;       /* slate-400 */
+      --text:#e5e7eb;        /* gray-200 */
+      --primary:#3b82f6;     /* blue-500 */
+      --ok:#10b981;          /* emerald-500 */
+      --warn:#f59e0b;        /* amber-500 */
+      --danger:#ef4444;      /* red-500 */
+      --ring:#334155;        /* slate-700 */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:linear-gradient(135deg,#0b1220 0%,#0f172a 60%,#111827 100%);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+      color:var(--text);
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(140%) blur(6px);
+      background:rgba(2,6,23,.6); /* slate-950/60 */
+      border-bottom:1px solid var(--ring);
+    }
+    .wrap{max-width:1100px; margin:0 auto; padding:16px;}
+    h1{margin:0 0 8px; font-size:clamp(20px,3vw,28px)}
+    .toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+    .toolbar > *{margin-right:6px}
+    .stat{
+      display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--ring);
+      border-radius:999px; font-size:14px; color:var(--muted);
+    }
+    .badge{padding:.2rem .5rem; border-radius:999px; font-size:12px; font-weight:600}
+    .badge.ok{background:rgba(16,185,129,.12); color:#34d399; border:1px solid rgba(16,185,129,.35)}
+    .badge.busy{background:rgba(239,68,68,.12); color:#f87171; border:1px solid rgba(239,68,68,.35)}
+
+    .btn{appearance:none; border:none; padding:10px 12px; border-radius:12px; color:#fff; background:#1f2937; /* gray-800 */
+         cursor:pointer; font-weight:600; border:1px solid var(--ring); transition:transform .05s ease, background .2s}
+    .btn:hover{background:#243041}
+    .btn:active{transform:scale(.98)}
+    .btn.primary{background:linear-gradient(180deg,#3b82f6,#2563eb); border-color:#1d4ed8}
+    .btn.ok{background:linear-gradient(180deg,#10b981,#059669); border-color:#047857}
+    .btn.warn{background:linear-gradient(180deg,#f59e0b,#d97706); border-color:#b45309}
+    .btn.ghost{background:transparent}
+
+    .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    select, input[type="search"]{
+      background:#0b1220; color:var(--text); border:1px solid var(--ring); border-radius:12px;
+      padding:10px 12px; outline:none; min-width:160px
+    }
+
+    .grid{display:grid; gap:12px; padding:16px 0; grid-template-columns:repeat( auto-fill, minmax(220px, 1fr) );}
+    .card{
+      background:linear-gradient(180deg, rgba(17,24,39,.9), rgba(2,6,23,.85));
+      border:1px solid var(--ring); border-radius:18px; padding:14px; box-shadow:0 6px 18px rgba(0,0,0,.25);
+      display:flex; flex-direction:column; gap:10px; min-height:130px
+    }
+    .card .head{display:flex; justify-content:space-between; align-items:center}
+    .title{font-weight:700; letter-spacing:.3px}
+    .status{display:inline-flex; align-items:center; gap:8px}
+    .pill{font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid; font-weight:700; letter-spacing:.3px}
+    .pill.free{color:#34d399; border-color:rgba(16,185,129,.35); background:rgba(16,185,129,.12)}
+    .pill.busy{color:#f87171; border-color:rgba(239,68,68,.35); background:rgba(239,68,68,.12)}
+
+    .meta{font-size:12px; color:var(--muted)}
+    .actions{display:flex; gap:8px; margin-top:auto}
+    .toggle{flex:1}
+
+    .card.busy{outline:1px dashed rgba(239,68,68,.35)}
+    .card.free{outline:1px dashed rgba(16,185,129,.35)}
+
+    footer{border-top:1px solid var(--ring); color:var(--muted)}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Quản lý phòng học</h1>
+      <div class="toolbar">
+        <span class="stat">Tổng phòng: <strong id="totalCount">20</strong></span>
+        <span class="stat">Trống: <strong id="freeCount">0</strong></span>
+        <span class="stat">Đang dùng: <strong id="busyCount">0</strong></span>
+        <span class="stat">Cập nhật: <strong id="lastGlobalUpdate">—</strong></span>
+      </div>
+      <div class="controls" style="margin-top:10px">
+        <select id="filter">
+          <option value="all">Tất cả</option>
+          <option value="free">Chỉ phòng trống</option>
+          <option value="busy">Chỉ phòng đang dùng</option>
+        </select>
+        <input id="search" type="search" placeholder="Tìm theo tên phòng… (ví dụ: Phòng 05)" />
+        <button class="btn ok" id="setAllFree">Đặt tất cả TRỐNG</button>
+        <button class="btn warn" id="setAllBusy">Đặt tất cả ĐANG DÙNG</button>
+        <button class="btn ghost" id="resetData">Xóa dữ liệu</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="grid" class="grid" aria-live="polite"></div>
+  </main>
+
+  <footer class="wrap" style="padding-bottom:24px">
+    <small>Trạng thái được lưu ở <em>trình duyệt</em> (localStorage). Đổi máy/trình duyệt sẽ không đồng bộ.</small>
+  </footer>
+
+  <script>
+    const STORAGE_KEY = 'rooms.v1';
+    const now = () => new Date();
+    const fmt = (d) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(d);
+
+    function initialRooms(){
+      return Array.from({length:20}, (_,i)=>({
+        id: i+1,
+        name: `Phòng ${String(i+1).padStart(2,'0')}`,
+        busy: false,
+        updatedAt: now().toISOString()
+      }));
+    }
+
+    function load(){
+      try{ const raw = localStorage.getItem(STORAGE_KEY); if(!raw) return initialRooms();
+        const data = JSON.parse(raw);
+        if (!Array.isArray(data) || data.length!==20) return initialRooms();
+        return data;
+      }catch{ return initialRooms(); }
+    }
+    function save(data){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+
+    let rooms = load();
+
+    // DOM refs
+    const grid = document.getElementById('grid');
+    const totalCount = document.getElementById('totalCount');
+    const freeCount = document.getElementById('freeCount');
+    const busyCount = document.getElementById('busyCount');
+    const lastGlobalUpdate = document.getElementById('lastGlobalUpdate');
+    const filter = document.getElementById('filter');
+    const search = document.getElementById('search');
+    const setAllFree = document.getElementById('setAllFree');
+    const setAllBusy = document.getElementById('setAllBusy');
+    const resetData = document.getElementById('resetData');
+
+    function render(){
+      const q = (search.value || '').toLowerCase();
+      const f = filter.value; // all | free | busy
+
+      const filtered = rooms.filter(r => {
+        const matchName = r.name.toLowerCase().includes(q);
+        const matchState = f==='all' || (f==='free' && !r.busy) || (f==='busy' && r.busy);
+        return matchName && matchState;
+      });
+
+      totalCount.textContent = rooms.length;
+      const busy = rooms.filter(r=>r.busy).length;
+      const free = rooms.length - busy;
+      freeCount.textContent = free;
+      busyCount.textContent = busy;
+      const last = rooms.reduce((acc,r)=> acc>r.updatedAt? acc : r.updatedAt, rooms[0]?.updatedAt);
+      lastGlobalUpdate.textContent = last ? fmt(new Date(last)) : '—';
+
+      grid.innerHTML = filtered.map(r => {
+        const pill = r.busy ? '<span class="pill busy">ĐANG DÙNG</span>' : '<span class="pill free">TRỐNG</span>';
+        return `
+          <div class="card ${r.busy? 'busy' : 'free'}" data-id="${r.id}">
+            <div class="head">
+              <div class="title">${r.name}</div>
+              <div class="status">${pill}</div>
+            </div>
+            <div class="meta">Cập nhật: ${fmt(new Date(r.updatedAt))}</div>
+            <div class="actions">
+              <button class="btn toggle ${r.busy? 'primary' : 'ok'}" data-action="toggle" aria-pressed="${r.busy}">
+                ${r.busy? 'Chuyển thành TRỐNG' : 'Đánh dấu ĐANG DÙNG'}
+              </button>
+              <button class="btn ghost" data-action="rename" title="Đổi tên phòng">Đổi tên</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function update(id, patch){
+      const idx = rooms.findIndex(x=>x.id===id);
+      if (idx<0) return;
+      rooms[idx] = { ...rooms[idx], ...patch, updatedAt: now().toISOString() };
+      save(rooms); render();
+    }
+
+    grid.addEventListener('click', (e)=>{
+      const card = e.target.closest('.card'); if(!card) return;
+      const id = Number(card.getAttribute('data-id'));
+      const action = e.target.getAttribute('data-action');
+      if(action==='toggle'){
+        const r = rooms.find(x=>x.id===id);
+        update(id, { busy: !r.busy });
+      } else if(action==='rename'){
+        const r = rooms.find(x=>x.id===id);
+        const name = prompt('Nhập tên phòng mới:', r.name);
+        if(name && name.trim()) update(id, { name: name.trim() });
+      }
+    });
+
+    filter.addEventListener('change', render);
+    search.addEventListener('input', render);
+
+    setAllFree.addEventListener('click', ()=>{
+      if(!confirm('Đặt TẤT CẢ phòng về TRỐNG?')) return;
+      rooms = rooms.map(r=>({ ...r, busy:false, updatedAt: now().toISOString() }));
+      save(rooms); render();
+    });
+
+    setAllBusy.addEventListener('click', ()=>{
+      if(!confirm('Đặt TẤT CẢ phòng về ĐANG DÙNG?')) return;
+      rooms = rooms.map(r=>({ ...r, busy:true, updatedAt: now().toISOString() }));
+      save(rooms); render();
+    });
+
+    resetData.addEventListener('click', ()=>{
+      if(!confirm('Xóa dữ liệu trạng thái hiện tại và khởi tạo lại?')) return;
+      rooms = initialRooms(); save(rooms); render();
+    });
+
+    // Khởi động
+    render();
+  </script>
+</body>
+</html>
